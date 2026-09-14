@@ -7,7 +7,6 @@ import android.content.pm.ApplicationInfo
 import android.net.Uri
 import android.os.Bundle
 import android.provider.Settings
-import android.util.Log
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
@@ -101,7 +100,6 @@ fun LeftScreen(modifier: Modifier) {
 
     LaunchedEffect(Unit) {
         SettingsManager().readString("token", context) { token ->
-            Log.d("Token", token)
             tokenPresent = token.length > 5
         }
         SettingsManager().readString("game", context) { game ->

@@ -10,3 +10,7 @@
 local.properties
 /app/src/main/java/com/sajeg/questrpc/secrets.kt
 /app/release/
+secrets.properties
+keystore.properties
+*.jks
+*.keystore

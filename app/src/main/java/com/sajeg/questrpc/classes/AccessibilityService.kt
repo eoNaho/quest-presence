@@ -3,10 +3,12 @@ package com.sajeg.questrpc.classes
 import android.accessibilityservice.AccessibilityService
 import android.content.Intent
 import android.content.IntentFilter
-import android.util.Log
 import android.view.accessibility.AccessibilityEvent
+import androidx.core.content.ContextCompat
 
 class AccessibilityService : AccessibilityService() {
+
+    private val screenStateReceiver = ScreenStateReceiver()
 
     override fun onServiceConnected() {
         super.onServiceConnected()
@@ -15,13 +17,21 @@ class AccessibilityService : AccessibilityService() {
             addAction(Intent.ACTION_SCREEN_ON)
             addAction(Intent.ACTION_SCREEN_OFF)
         }
-        registerReceiver(ScreenStateReceiver(), filter)
+        // Android 13+ (API 33) requires RECEIVER_EXPORTED/RECEIVER_NOT_EXPORTED to be
+        // specified, otherwise registerReceiver throws a SecurityException at runtime.
+        // SCREEN_ON/OFF are system-protected broadcasts, so NOT_EXPORTED is safe here.
+        ContextCompat.registerReceiver(
+            this,
+            screenStateReceiver,
+            filter,
+            ContextCompat.RECEIVER_NOT_EXPORTED
+        )
 
     }
 
     override fun onDestroy() {
         super.onDestroy()
-        unregisterReceiver(ScreenStateReceiver())
+        unregisterReceiver(screenStateReceiver)
         ActivityManager.stop(this)
     }
 
@@ -31,9 +41,6 @@ class AccessibilityService : AccessibilityService() {
         }
         if (p0.eventType == AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED) {
             val packageName = p0.packageName?.toString()
-            if (packageName == "com.oculus.shellenv") {
-                ActivityManager.stop(this)
-            }
             ActivityManager.appChanged(packageName.toString(), this)
         }
     }

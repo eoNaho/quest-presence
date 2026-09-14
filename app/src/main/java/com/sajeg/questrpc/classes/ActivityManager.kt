@@ -26,7 +26,7 @@ object ActivityManager {
         SettingsManager().saveString("game", "null", context)
         if (rpc != null) {
             rpc!!.closeRPC()
-            rpc == null
+            rpc = null
         }
     }
 
@@ -43,40 +43,47 @@ object ActivityManager {
     }
 
     fun appChanged(packageName: String, context: Context) {
-        if (rpc == null) {
-            return
-        }
         if (lastApp != packageName) {
             startTime = System.currentTimeMillis()
         }
-        val apps = getInstalledVrGames(context)
-        apps.forEach { vrGame ->
-            if (vrGame.packageName == packageName) {
-                AppManager().getExcludedApps(context) { apps ->
-                    if (apps.contains(packageName)) {
-                        return@getExcludedApps
+        val isVrGame = getInstalledVrGames(context).any { it.packageName == packageName }
+        lastApp = packageName
+
+        if (!isVrGame) {
+            // Foreground app isn't a recognized VR game - the user left whatever game
+            // was running (Quest Home, dashboard, browser, settings, ...). Clear the
+            // presence instead of leaving it stuck on the last game. This replaces the
+            // old check that only did this for the specific "com.oculus.shellenv"
+            // package, which missed every other non-game screen.
+            if (rpc != null) {
+                stop(context)
+            }
+            return
+        }
+
+        AppManager().getExcludedApps(context) { excludedApps ->
+            if (excludedApps.contains(packageName)) {
+                return@getExcludedApps
+            }
+            AppManager().getCustomAppNames(context) { names ->
+                names.forEach { name ->
+                    if (name.packageName == packageName) {
+                        Log.d("NowPlayingC", name.name)
+                        createActivity(name.name, packageName, context)
+                        return@getCustomAppNames
                     }
-                    AppManager().getCustomAppNames(context) { names ->
-                        names.forEach { name ->
-                            if (name.packageName == packageName) {
-                                Log.d("NowPlayingC", name.name)
-                                createActivity(name.name, packageName, context)
-                                return@getCustomAppNames
-                            }
-                        }
-                        AppManager().getStoreNames(context) { savedStoreNames ->
-                            savedStoreNames.forEach { name ->
-                                if (name.packageName == packageName) {
-                                    Log.d("NowPlayingS", name.name)
-                                    createActivity(name.name, packageName, context)
-                                    return@getStoreNames
-                                }
-                            }
-                            val appName = getAppNameFromPackageName(packageName.toString(), context)
-                            Log.d("NowPlayingA", appName)
-                            createActivity(appName, packageName, context)
+                }
+                AppManager().getStoreNames(context) { savedStoreNames ->
+                    savedStoreNames.forEach { name ->
+                        if (name.packageName == packageName) {
+                            Log.d("NowPlayingS", name.name)
+                            createActivity(name.name, packageName, context)
+                            return@getStoreNames
                         }
                     }
+                    val appName = getAppNameFromPackageName(packageName.toString(), context)
+                    Log.d("NowPlayingA", appName)
+                    createActivity(appName, packageName, context)
                 }
             }
         }
@@ -95,31 +102,44 @@ object ActivityManager {
 
     fun createActivity(name: String, packageName: String, context: Context) {
         SettingsManager().saveString("game", name, context)
-        if (rpc == null) {
-            start(context)
+
+        fun sendActivity() {
+            WebRequest().getImageUrl(packageName) { image ->
+                rpc?.setActivity(
+                    activity = Activity(
+                        applicationId = "1299052584761561161",
+                        name = name,
+                        details = "on a Meta ${
+                            Settings.Global.getString(
+                                context.contentResolver,
+                                "device_name"
+                            ) ?: "Unknown Device"
+                        }",
+                        type = 0,
+                        assets = Assets(
+                            largeImage = image,
+                            smallImage = null,
+                            largeText = "Meta Quest",
+                            smallText = null
+                        )
+                    ),
+                    status = "online",
+                    since = startTime
+                )
+            }
         }
-        WebRequest().getImageUrl(packageName) { image ->
-            rpc!!.setActivity(
-                activity = Activity(
-                    applicationId = "1299052584761561161",
-                    name = name,
-                    details = "on a Meta ${
-                        Settings.Global.getString(
-                            context.contentResolver,
-                            "device_name"
-                        ) ?: "Unknown Device"
-                    }",
-                    type = 0,
-                    assets = Assets(
-                        largeImage = image,
-                        smallImage = null,
-                        largeText = "Meta Quest",
-                        smallText = null
-                    )
-                ),
-                status = "online",
-                since = startTime
-            )
+
+        // start(context) reads the saved token from disk asynchronously, so calling it
+        // and immediately using `rpc` (as this used to do) raced: on a cold start, rpc
+        // was still null by the time setActivity ran, silently dropping the very first
+        // presence update until the app/game was restarted. Wait for the token instead.
+        if (rpc == null) {
+            SettingsManager().readString("token", context) { token ->
+                rpc = KizzyRPC(token)
+                sendActivity()
+            }
+        } else {
+            sendActivity()
         }
     }
 }

@@ -1,0 +1,13 @@
+# Copy this file to "local.properties" (same folder, git-ignored) and fill in real values.
+# local.properties is read both by the Android Gradle Plugin (sdk.dir) and by the
+# secrets-gradle-plugin, which turns every other key here into a BuildConfig field.
+# BuildConfig.webhook / BuildConfig.webhookId are used in WebRequest.kt to upload
+# game icons to a Discord channel so Discord's CDN can serve them back for Rich Presence.
+
+sdk.dir=/path/to/your/Android/Sdk
+
+# How to get webhookId/webhook:
+# 1. In a Discord server you control: Server Settings > Integrations > Webhooks > New Webhook
+# 2. Copy the webhook URL, e.g. https://discord.com/api/webhooks/<id>/<token>
+webhookId=YOUR_DISCORD_WEBHOOK_ID_HERE
+webhook=YOUR_DISCORD_WEBHOOK_TOKEN_HERE

@@ -41,7 +41,7 @@ class WebRequest() {
             addFormDataPart("files[0]", "icon.jpg", imageData!!.toRequestBody(imageType))
         }.build()
         val request = Request.Builder().apply {
-            url("https://canary.discord.com/api/webhooks/1379442109240574063/${BuildConfig.webhook}")
+            url("https://canary.discord.com/api/webhooks/${BuildConfig.webhookId}/${BuildConfig.webhook}")
             post(formBody)
         }.build()
         val response = client.newCall(request).execute()
